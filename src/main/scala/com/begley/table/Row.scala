@@ -4,6 +4,7 @@ import collection.mutable.Map
 import collection.immutable.TreeMap
 import scala.collection.immutable.ListMap
 import org.joda.time.LocalDate
+import collection.JavaConversions._
 // TODO: NEED TO create table object?
 
 package object table {
@@ -23,14 +24,16 @@ object ColIndex {
 
   implicit def colIndexOrdering: Ordering[ColIndex] = Ordering.fromLessThan(_.date isBefore _.date)
 
-  def apply(dateAsString: String) = new ColIndex(dateAsString, table.date(dateAsString)) 
+  def apply(dateAsString: String) = new ColIndex(dateAsString, table.date(dateAsString))
 
   def apply(label: String, dateStr: String) = new ColIndex(label, table.date(dateStr))
-  
-  def apply(date:LocalDate) = new ColIndex(date.toString(),date)
+
+  def apply(date: LocalDate) = new ColIndex(date.toString(), date)
 
 }
-
+/**
+ * 
+ */
 case class Cell(row: RowIndex, column: ColIndex, value: table.Value) {
   override def toString: String = "[" + value.getOrElse("-") + "]"
 }
@@ -43,10 +46,18 @@ case class Row(row: TreeMap[ColIndex, Cell]) {
 
   def +(that: Row) = applyZipFn(that, addRowTuple) // todo: maybe? be able to curry this?
   def -(that: Row) = applyZipFn(that, subRowTuple)
+  def *(that: Row) = applyZipFn(that, multRowTuple)
+  def /(that: Row) = applyZipFn(that, divRowTuple)
   def incDec() = calc(increaseDecrease)
   def gr() = calc(growthRate)
   def avg() = average;
   def ttm() = trailingFourPeriods;
+  
+
+  
+  def getLastCell:Option[Cell] = {
+    row.get(row.lastKey)
+  }
 
   private def addRowTuple(pair: table.ValuePair): table.Value = {
     pair match {
@@ -62,6 +73,23 @@ case class Row(row: TreeMap[ColIndex, Cell]) {
       case (Some(l), Some(r)) => Some(l - r)
       case (None, Some(r)) => Some(0D - r)
       case (Some(l), None) => Some(l)
+      case _ => None
+    }
+  }
+
+  private def multRowTuple(pair: table.ValuePair): table.Value = {
+    pair match {
+      case (Some(l), Some(r)) => Some(l * r)
+      case (None, Some(r)) => Some(0) // null * X should be 0?
+      case (Some(l), None) => Some(0) // X * null should be 0?
+      case _ => None
+    }
+  }
+
+  private def divRowTuple(pair: table.ValuePair): table.Value = {
+    pair match {
+      case (Some(l), Some(r)) => if (r != 0) Some(l / r) else None
+      case (None, Some(r)) => if (r != 0) Some(0D) else None
       case _ => None
     }
   }
@@ -128,6 +156,41 @@ case class Row(row: TreeMap[ColIndex, Cell]) {
       case (None, Some(r)) => Some(r)
       case _ => None
     }
+  }
+
+}
+
+object Row {
+
+  implicit def reflector(ref: AnyRef) = new {
+    def getV(name: String): Any = ref.getClass.getMethods.find(_.getName == name).get.invoke(ref)
+    def setV(name: String, value: Any): Unit = ref.getClass.getMethods.find(_.getName == name + "_$eq").get.invoke(ref, value.asInstanceOf[AnyRef])
+  }
+  // use currying here.. creates function that has just "property" as param....!!!
+  def exstractRow(list: java.util.List[FinFact], property: String): Row = {
+
+    val rowIndex1 = RowIndex(property)
+    var tm = TreeMap[ColIndex, Cell]()
+
+    list.toList.map((is: FinFact) => {
+      val colIndex = ColIndex(is.getDate)
+
+      val dVal: Option[Double] = is.getV(property) match {
+        case i: java.lang.Long => Option(i.toDouble)
+        case d: java.lang.Double => Option(d)
+        case x: java.lang.Integer => Option(x.toDouble)
+        case Some(l: Long) => Some(l.toDouble)
+        case Some(dd: Double) => Some(dd)
+        case Some(int: Int) => Some(int.toDouble)
+        case _ => None
+      }
+
+      tm += colIndex -> Cell(rowIndex1, colIndex, dVal)
+
+    })
+
+    Row(tm)
+
   }
 
 }

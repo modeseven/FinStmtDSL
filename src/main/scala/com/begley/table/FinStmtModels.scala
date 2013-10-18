@@ -5,8 +5,14 @@ import scala.beans.ScalaBeanInfo
 
 // facts for a simple income statement
 
-case class IncomeStmt(
+trait FinFact {
+  def getDate():LocalDate
+}
+
+case class IncomeStmt (
   date:LocalDate,  
   revenue: Option[Long] = None,
-  costOfGoodsSold: Option[Long] = None)
+  costOfGoodsSold: Option[Long] = None) extends FinFact{  
+  def getDate():LocalDate = date
+}
   

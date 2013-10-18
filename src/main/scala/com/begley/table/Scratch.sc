@@ -17,41 +17,48 @@ object Scratch {
                                                   //> is4  : com.begley.table.IncomeStmt = IncomeStmt(2013-01-12,Some(170),Some(75
                                                   //| ))
 
-  val isl = List(is1, is2, is3, is4)              //> isl  : List[com.begley.table.IncomeStmt] = List(IncomeStmt(2010-01-12,None,N
-                                                  //| one), IncomeStmt(2011-01-12,Some(100),Some(50)), IncomeStmt(2012-01-12,Some(
-                                                  //| 120),Some(10)), IncomeStmt(2013-01-12,Some(170),Some(75)))
+  var isl: java.util.List[FinFact] = new java.util.ArrayList()
+                                                  //> isl  : java.util.List[com.begley.table.FinFact] = []
+  isl.add(is1)                                    //> res0: Boolean = true
+  isl.add(is2)                                    //> res1: Boolean = true
+  isl.add(is3)                                    //> res2: Boolean = true
+  isl.add(is4)                                    //> res3: Boolean = true
 
-  implicit def reflector(ref: AnyRef) = new {
-    def getV(name: String): Any = ref.getClass.getMethods.find(_.getName == name).get.invoke(ref)
-    def setV(name: String, value: Any): Unit = ref.getClass.getMethods.find(_.getName == name + "_$eq").get.invoke(ref, value.asInstanceOf[AnyRef])
-  }                                               //> reflector: (ref: AnyRef)AnyRef{def getV(name: String): Any; def setV(name: S
-                                                  //| tring,value: Any): Unit}
+// use currying here.. creates function that has just "property" as param....!!!
 
-  def rowify(list: List[IncomeStmt], property: String): Row = {
-    val rowIndex1 = RowIndex("Revenue")
-    var tm = TreeMap[ColIndex, Cell]()
 
-    list map ((is: IncomeStmt) => {
-      val colIndex = ColIndex(is.date)
-      val anyVal:Option[Double] = is.getV(property) match {
-        case i: Option[Long] =>  if (i.isDefined) Some(i.get.toDouble) else None
-        case _ => None
-      }
-      val value: Option[Double] = anyVal
+  val revRow = Row.exstractRow(isl, "revenue")    //> revRow  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 -> [1
+                                                  //| 00.0], 2012-01-12 -> [120.0], 2013-01-12 -> [170.0]))
+  val cogs = Row.exstractRow(isl, "costOfGoodsSold")
+                                                  //> cogs  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 -> [50.
+                                                  //| 0], 2012-01-12 -> [10.0], 2013-01-12 -> [75.0]))
+  val grossProfit = revRow - cogs                 //> grossProfit  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 
+                                                  //| -> [50.0], 2012-01-12 -> [110.0], 2013-01-12 -> [95.0]))
+  
+  val profGR = grossProfit gr                     //> profGR  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 -> [-
+                                                  //| ], 2012-01-12 -> [1.2], 2013-01-12 -> [-0.13636363636363635]))
+                                                  
+   val rowList = List(revRow,cogs,grossProfit)    //> rowList  : List[com.begley.table.Row] = List(Row(Map(2010-01-12 -> [-], 2011
+                                                  //| -01-12 -> [100.0], 2012-01-12 -> [120.0], 2013-01-12 -> [170.0])), Row(Map(2
+                                                  //| 010-01-12 -> [-], 2011-01-12 -> [50.0], 2012-01-12 -> [10.0], 2013-01-12 -> 
+                                                  //| [75.0])), Row(Map(2010-01-12 -> [-], 2011-01-12 -> [50.0], 2012-01-12 -> [11
+                                                  //| 0.0], 2013-01-12 -> [95.0])))
+                                                  
+  rowList.map(_.gr).map(_.avg)                    //> res4: List[com.begley.table.Row] = List(Row(Map(2010-01-12 -> [0.15416666666
+                                                  //| 666667], 2011-01-12 -> [0.20555555555555557], 2012-01-12 -> [0.3083333333333
+                                                  //| 3335], 2013-01-12 -> [0.4166666666666667])), Row(Map(2010-01-12 -> [1.425], 
+                                                  //| 2011-01-12 -> [1.9000000000000001], 2012-01-12 -> [2.85], 2013-01-12 -> [6.5
+                                                  //| ])), Row(Map(2010-01-12 -> [0.2659090909090909], 2011-01-12 -> [0.3545454545
+                                                  //| 454545], 2012-01-12 -> [0.5318181818181817], 2013-01-12 -> [-0.1363636363636
+                                                  //| 3635])))
 
-      tm += colIndex -> Cell(rowIndex1, colIndex, value)
+   
+   
+                                                  
+                                                  
+  
 
-    })
 
-    Row(tm)
-
-  }                                               //> rowify: (list: List[com.begley.table.IncomeStmt], property: String)com.begl
-                                                  //| ey.table.Row
-
-  val revRow = rowify(isl, "costOfGoodsSold")     //> revRow  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 -> [
-                                                  //| 50.0], 2012-01-12 -> [10.0], 2013-01-12 -> [75.0]))
-
-  val revGr = revRow gr                           //> revGr  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 -> [-
-                                                  //| ], 2012-01-12 -> [-0.8], 2013-01-12 -> [6.5]))
+   
 
 }
