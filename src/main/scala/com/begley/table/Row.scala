@@ -14,6 +14,21 @@ package object table {
   def date(dateStr: String) = LocalDate.fromDateFields(table.dateFormat.parse(dateStr))
 }
 
+// facts for a simple income statement
+
+trait FinFact {
+  def getDate():LocalDate
+}
+
+case class IncomeStmt (
+  date:LocalDate,  
+  revenue: Option[Long] = None,
+  costOfGoodsSold: Option[Long] = None) extends FinFact{  
+  def getDate():LocalDate = date
+}
+
+
+
 case class RowIndex(label: String)
 
 case class ColIndex(label: String, date: LocalDate) {
@@ -32,7 +47,7 @@ object ColIndex {
 
 }
 /**
- * 
+ *
  */
 case class Cell(row: RowIndex, column: ColIndex, value: table.Value) {
   override def toString: String = "[" + value.getOrElse("-") + "]"
@@ -52,10 +67,8 @@ case class Row(row: TreeMap[ColIndex, Cell]) {
   def gr() = calc(growthRate)
   def avg() = average;
   def ttm() = trailingFourPeriods;
-  
 
-  
-  def getLastCell:Option[Cell] = {
+  def getLastCell: Option[Cell] = {
     row.get(row.lastKey)
   }
 
@@ -191,6 +204,11 @@ object Row {
 
     Row(tm)
 
+  }
+
+  @annotation.varargs
+  def sum(x: Row*): Row = {
+    x.toList.reduceLeft(_ + _)
   }
 
 }

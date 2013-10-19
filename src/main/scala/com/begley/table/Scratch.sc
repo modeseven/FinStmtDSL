@@ -35,8 +35,8 @@ object Scratch {
   val grossProfit = revRow - cogs                 //> grossProfit  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 
                                                   //| -> [50.0], 2012-01-12 -> [110.0], 2013-01-12 -> [95.0]))
   
-  val profGR = grossProfit gr                     //> profGR  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 -> [-
-                                                  //| ], 2012-01-12 -> [1.2], 2013-01-12 -> [-0.13636363636363635]))
+  val sumall = Row.sum(revRow,cogs)               //> sumall  : com.begley.table.Row = Row(Map(2010-01-12 -> [-], 2011-01-12 -> [1
+                                                  //| 50.0], 2012-01-12 -> [130.0], 2013-01-12 -> [245.0]))
                                                   
    val rowList = List(revRow,cogs,grossProfit)    //> rowList  : List[com.begley.table.Row] = List(Row(Map(2010-01-12 -> [-], 2011
                                                   //| -01-12 -> [100.0], 2012-01-12 -> [120.0], 2013-01-12 -> [170.0])), Row(Map(2
@@ -51,6 +51,16 @@ object Scratch {
                                                   //| ])), Row(Map(2010-01-12 -> [0.2659090909090909], 2011-01-12 -> [0.3545454545
                                                   //| 454545], 2012-01-12 -> [0.5318181818181817], 2013-01-12 -> [-0.1363636363636
                                                   //| 3635])))
+                                                  
+                                                  
+  def sum(x:Int *):Int={
+  x.toList.reduceLeft(_ + _)
+  }                                               //> sum: (x: Int*)Int
+  
+  
+  sum(4,3,4)                                      //> res5: Int = 11
+  
+  
 
    
    
