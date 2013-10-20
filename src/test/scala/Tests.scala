@@ -5,6 +5,7 @@ import Assert._
 import com.begley.table.ColIndex
 import org.joda.time.LocalDate
 import com.begley.table._
+import com.begley.model.IncomeStatement
 import scala.collection.immutable.TreeMap
 
 
@@ -17,6 +18,8 @@ class Tests {
     def date(dateStr: String) = {
       LocalDate.fromDateFields(format.parse(dateStr))
     }
+    
+    val asdf = new IncomeStatement
 
     val colIndex1 = ColIndex("1", date("12/31/2010"))
 

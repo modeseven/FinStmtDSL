@@ -45,9 +45,11 @@ public class Test implements FinFact {
 		Row r = Row.apply(list, "getVal");
 		Row r2 = Row.apply(list, "getVal2");
 		
+		
+		
 		System.out.println("average" + r.avg());
 		System.out.println(r2);
-		System.out.println("years back" + r2.getColumIndices());
+		//System.out.println("years back" + r2.getColumIndices());
 		
 	
 		
@@ -55,11 +57,11 @@ public class Test implements FinFact {
 		
 	
 		
-		Row sumRow = Row.sum(r,r2,r.avg());
+		//Row sumRow = Row.sum(r,r2,r.avg());
 		
-		Row sumAvg = sumRow.avg();
-		System.out.println(sumRow);
-		System.out.println(sumAvg);
+//		Row sumAvg = sumRow.avg();
+//		System.out.println(sumRow);
+//		System.out.println(sumAvg);
 		
 	
 	}
@@ -92,8 +94,12 @@ public class Test implements FinFact {
 		this.date = date;
 	}
 
+	public Date getDate() {
+		return date;
+	}
+
 	@Override
-	public LocalDate getDate() {
+	public LocalDate getLocalDate() {
 		return new LocalDate(date);
 	}
 	

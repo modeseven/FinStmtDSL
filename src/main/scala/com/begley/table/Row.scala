@@ -14,7 +14,7 @@ package object table {
 }
 
 trait FinFact {
-  def getDate(): LocalDate
+  def getLocalDate(): LocalDate
 }
 
 // facts for a simple income statement
@@ -23,12 +23,37 @@ case class IncomeStmt(
   date: LocalDate,
   revenue: Option[Long] = None,
   costOfGoodsSold: Option[Long] = None) extends FinFact {
-  def getDate(): LocalDate = date
+  def getLocalDate(): LocalDate = date
+}
+// shouold use immutable treemap?
+case class RowMap(var rmap: collection.immutable.Map[String, Row] = collection.immutable.Map.empty) {
+  def add(key: String, row: Row): Row = {
+    rmap += (key -> row) // if rmap is avar i can use += else I cant'.. i can only use + , what does this mean?
+    row
+  }
+  def get(key: String) = rmap.get(key)
+  def avg() = RowMap(rmap.mapValues(_.avg))
+  def gr() = RowMap(rmap.mapValues(_.gr))
+  def grAvg() = gr avg
+}
+
+
+class RowBuilder(factList: java.util.List[FinFact]) {
+  private val map: RowMap = new RowMap
+
+  def exstractRow(label: String, methodName: String): Row = map.add(label, Row(factList, methodName))
+
+  def calcRow(label: String, row: Row): Row = map.add(label, row)
+
+  def getRow(label: String) = map.get(label)
+
+  def getMap = map
+
 }
 
 // do i want this kind of equality? if you add the same day.. it overrides one alreayd aded.. is this ok??? maybe not a case class.....
 case class ColIndex(label: String, date: LocalDate) {
-  override def toString: String = "lable" + label
+  override def toString: String = label
 }
 
 object ColIndex {
@@ -43,22 +68,27 @@ object ColIndex {
 
 }
 /**
- *
+ * not sure we need cells at all?
  */
 case class Cell(column: ColIndex, value: table.Value) { //not sure if cell needs row index..
-  override def toString: String = "[" + value.getOrElse("-") + "]"
+  override def toString: String = "[" + value.getOrElse("-").formatted("%.3f") + "]"
 }
 
 case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
 
-  def +(that: Row) = applyZipFn(that, addRowTuple, this.desc + "+" + that.desc)
-  def -(that: Row) = applyZipFn(that, subRowTuple, this.desc + "-" + that.desc)
-  def *(that: Row) = applyZipFn(that, multRowTuple, this.desc + "*" + that.desc)
-  def /(that: Row) = applyZipFn(that, divRowTuple, this.desc + "/" + that.desc)
+  def plus(that: Row) = applyZipFn(that, addRowTuple, this.desc + "+" + that.desc)
+  def minus(that: Row) = applyZipFn(that, subRowTuple, this.desc + "-" + that.desc)
+  def mult(that: Row) = applyZipFn(that, multRowTuple, this.desc + "*" + that.desc)
+  def div(that: Row) = applyZipFn(that, divRowTuple, this.desc + "/" + that.desc)
   def incDec() = calc(increaseDecrease, "incDec(" + this.desc + ")")
   def gr() = calc(growthRate, "gr(" + this.desc + ")")
   def avg() = average;
   def ttm() = trailingFourPeriods;
+
+  def +(that: Row) = plus(that)
+  def -(that: Row) = minus(that)
+  def *(that: Row) = mult(that)
+  def /(that: Row) = div(that)
   // todo: weigthed avg.
 
   override def toString: String = desc + ":" + row
@@ -185,12 +215,13 @@ object Row {
     def setV(name: String, value: Any): Unit = ref.getClass.getMethods.find(_.getName == name + "_$eq").get.invoke(ref, value.asInstanceOf[AnyRef])
   }
 
+  // CHANGE TO "EXSTRACT ROW" and make it an Optional[Row]
   def apply(list: java.util.List[FinFact], property: String): Row = {
 
     var tm = TreeMap[ColIndex, Cell]()
 
     list.toList.map((is: FinFact) => {
-      val colIndex = ColIndex(is.getDate)
+      val colIndex = ColIndex(is.getLocalDate)
 
       val dVal: Option[Double] = is.getV(property) match {
         case i: java.lang.Long => Option(i.toDouble)
