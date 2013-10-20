@@ -5,7 +5,6 @@ import collection.immutable.TreeMap
 import scala.collection.immutable.ListMap
 import org.joda.time.LocalDate
 import collection.JavaConversions._
-// TODO: NEED TO create table object?
 
 package object table {
   type Value = Option[Double]
@@ -14,25 +13,22 @@ package object table {
   def date(dateStr: String) = LocalDate.fromDateFields(table.dateFormat.parse(dateStr))
 }
 
+trait FinFact {
+  def getDate(): LocalDate
+}
+
 // facts for a simple income statement
 
-trait FinFact {
-  def getDate():LocalDate
-}
-
-case class IncomeStmt (
-  date:LocalDate,  
+case class IncomeStmt(
+  date: LocalDate,
   revenue: Option[Long] = None,
-  costOfGoodsSold: Option[Long] = None) extends FinFact{  
-  def getDate():LocalDate = date
+  costOfGoodsSold: Option[Long] = None) extends FinFact {
+  def getDate(): LocalDate = date
 }
 
-
-
-case class RowIndex(label: String)
-
+// do i want this kind of equality? if you add the same day.. it overrides one alreayd aded.. is this ok??? maybe not a case class.....
 case class ColIndex(label: String, date: LocalDate) {
-  override def toString: String = label
+  override def toString: String = "lable" + label
 }
 
 object ColIndex {
@@ -49,28 +45,31 @@ object ColIndex {
 /**
  *
  */
-case class Cell(row: RowIndex, column: ColIndex, value: table.Value) {
+case class Cell(column: ColIndex, value: table.Value) { //not sure if cell needs row index..
   override def toString: String = "[" + value.getOrElse("-") + "]"
 }
 
-object Cell {
-  def apply(cell: Cell, value: table.Value) = new Cell(cell.row, cell.column, value)
-}
+case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
 
-case class Row(row: TreeMap[ColIndex, Cell]) {
-
-  def +(that: Row) = applyZipFn(that, addRowTuple) // todo: maybe? be able to curry this?
-  def -(that: Row) = applyZipFn(that, subRowTuple)
-  def *(that: Row) = applyZipFn(that, multRowTuple)
-  def /(that: Row) = applyZipFn(that, divRowTuple)
-  def incDec() = calc(increaseDecrease)
-  def gr() = calc(growthRate)
+  def +(that: Row) = applyZipFn(that, addRowTuple, this.desc + "+" + that.desc)
+  def -(that: Row) = applyZipFn(that, subRowTuple, this.desc + "-" + that.desc)
+  def *(that: Row) = applyZipFn(that, multRowTuple, this.desc + "*" + that.desc)
+  def /(that: Row) = applyZipFn(that, divRowTuple, this.desc + "/" + that.desc)
+  def incDec() = calc(increaseDecrease, "incDec(" + this.desc + ")")
+  def gr() = calc(growthRate, "gr(" + this.desc + ")")
   def avg() = average;
   def ttm() = trailingFourPeriods;
+  // todo: weigthed avg.
 
-  def getLastCell: Option[Cell] = {
-    row.get(row.lastKey)
-  }
+  override def toString: String = desc + ":" + row
+
+  def getLastCell: Option[Cell] = row.get(row.lastKey)
+
+  def getColumns: java.util.Set[ColIndex] = row.keySet
+
+  def getValues = row.values.map(_.value.getOrElse(Double.NaN)).toArray
+
+  def getColumIndices = row.keys.map(row.keys.toSeq.indexOf(_)).toList.reverse
 
   private def addRowTuple(pair: table.ValuePair): table.Value = {
     pair match {
@@ -107,58 +106,64 @@ case class Row(row: TreeMap[ColIndex, Cell]) {
     }
   }
 
-  def applyZipFn(that: Row, fn: ((Option[Double], Option[Double])) => Option[Double]) = {
+  def applyZipFn(that: Row, fn: ((Option[Double], Option[Double])) => Option[Double], fnDesc: String) = {
 
     val l = (this.row.values, that.row.values).zipped.map((top: Cell, bottom: Cell) => {
       val tup = (top.value, bottom.value)
       val sum = fn(tup)
-      Cell(top, sum)
+      Cell(top.column, sum)
     })
-    val m = l map { t => (t.column, t) } toMap //TODO: inefficient transformations?..
+    val m = l map { t => (t.column, t) } toMap
     val tm = TreeMap(m.toArray: _*)
-    Row(tm)
+    Row(tm, fnDesc)
 
   }
 
   def trailingFourPeriods(): Row = {
-    var lm: Map[ColIndex, Cell] = Map() // TODO: HOW TO MAKE THIS IMMUATEBLE?
+    var lm: Map[ColIndex, Cell] = Map()
 
     row.values.foldLeft(Array(0D, 0D, 0D, 0D))(
       (state: Array[Double], cell: Cell) => {
         val newState = Array(cell.value.getOrElse(0D), state(0), state(1), state(2))
-        lm(cell.column) = Cell(cell, Some(newState.reduceLeft(_ + _)))
+        lm(cell.column) = Cell(cell.column, Some(newState.reduceLeft(_ + _)))
         newState
-      } // end hof
-      )
-    Row(TreeMap(lm.toSeq: _*))
+      })
+    Row(TreeMap(lm.toSeq: _*), "ttm(" + this.desc + ")")
   }
 
-  def calc(fn: ((Option[Double], Option[Double])) => Option[Double]): Row = {
-    var lm: Map[ColIndex, Cell] = Map() // TODO: HOW TO MAKE THIS IMMUATEBLE?
+  def calc(fn: ((Option[Double], Option[Double])) => Option[Double], fnDesc: String): Row = {
+    var lm: Map[ColIndex, Cell] = Map()
 
     row.values.foldLeft(Option(0D))((i: Option[Double], cell: Cell) => {
       val incDec: Option[Double] = fn(i, cell.value)
-      lm(cell.column) = Cell(cell, incDec)
+      lm(cell.column) = Cell(cell.column, incDec)
       cell.value
     })
-    Row(TreeMap(lm.toSeq: _*))
+    Row(TreeMap(lm.toSeq: _*), fnDesc)
   }
 
-  def average(): Row = {
-    var lm: Map[ColIndex, Cell] = Map() // TODO: HOW TO MAKE THIS IMMUATEBLE?
+  private def average(): Row = {
+    //  var lm: Map[ColIndex, Cell] = Map()
+
+    var tm = TreeMap[ColIndex, Cell]()
 
     row.values.foldRight((1, 0D))(
       (cell: Cell, state: (Int, Double)) => {
         val curVal: Double = cell.value.getOrElse(0D)
-        lm(cell.column) = Cell(cell, Some((curVal + state._2) / state._1))
+        val yearsBack: String = row.keys.toSeq.indexOf(cell.column).toString
+        val colIndex = ColIndex(yearsBack, cell.column.date)
+        //   lm(colIndex) = Cell(colIndex, Some((curVal + state._2) / state._1)) 
+
+        tm += colIndex -> Cell(colIndex, Some((curVal + state._2) / state._1))
+
         (state._1 + 1, state._2 + curVal)
       })
-    Row(TreeMap(lm.toSeq: _*))
+    Row(tm, "avg(" + this.desc + ")")
   }
 
   def growthRate(pair: table.ValuePair): table.Value = {
     pair match {
-      case (Some(l), Some(r)) => Some((r - l) / l) // growth rate only calculated if both sides popluated
+      case (Some(l), Some(r)) => Some((r - l) / l) // growth rate only calculated if both sides populated
       case _ => None
     }
   }
@@ -179,10 +184,9 @@ object Row {
     def getV(name: String): Any = ref.getClass.getMethods.find(_.getName == name).get.invoke(ref)
     def setV(name: String, value: Any): Unit = ref.getClass.getMethods.find(_.getName == name + "_$eq").get.invoke(ref, value.asInstanceOf[AnyRef])
   }
-  // use currying here.. creates function that has just "property" as param....!!!
-  def exstractRow(list: java.util.List[FinFact], property: String): Row = {
 
-    val rowIndex1 = RowIndex(property)
+  def apply(list: java.util.List[FinFact], property: String): Row = {
+
     var tm = TreeMap[ColIndex, Cell]()
 
     list.toList.map((is: FinFact) => {
@@ -198,11 +202,11 @@ object Row {
         case _ => None
       }
 
-      tm += colIndex -> Cell(rowIndex1, colIndex, dVal)
+      tm += colIndex -> Cell(colIndex, dVal)
 
     })
 
-    Row(tm)
+    Row(tm, property)
 
   }
 

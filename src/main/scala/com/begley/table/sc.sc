@@ -30,8 +30,7 @@ object Scratch {
   val revRow = Row(isl, "revenue")                //> revRow  : com.begley.table.Row = revenue:Map(2010-01-12 -> [-], 2011-01-12 -
                                                   //| > [100.0], 2012-01-12 -> [120.0], 2013-01-12 -> [170.0])
   
-  revRow.getColumns                               //> res4: java.util.Set[com.begley.table.ColIndex] = [2010-01-12, 2011-01-12, 20
-                                                  //| 12-01-12, 2013-01-12]
+  revRow.getValues                                //> res4: Array[Double] = Array(NaN, 100.0, 120.0, 170.0)
   val cogs = Row(isl, "costOfGoodsSold")          //> cogs  : com.begley.table.Row = costOfGoodsSold:Map(2010-01-12 -> [-], 2011-0
                                                   //| 1-12 -> [50.0], 2012-01-12 -> [10.0], 2013-01-12 -> [75.0])
   val grossProfit = revRow - cogs                 //> grossProfit  : com.begley.table.Row = revenue-costOfGoodsSold:Map(2010-01-12

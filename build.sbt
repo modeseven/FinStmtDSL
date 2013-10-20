@@ -19,9 +19,7 @@ scalacOptions ++= Seq("-deprecation", "-unchecked")
 
 libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "0.6.0"
 
-    libraryDependencies ++= Seq(
-    "junit" % "junit" % "4.8.1" % "test"
-    )
+libraryDependencies += "com.novocode" % "junit-interface" % "0.9" % "test"
 
 
 
