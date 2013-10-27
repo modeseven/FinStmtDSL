@@ -5,6 +5,7 @@ import collection.immutable.TreeMap
 import scala.collection.immutable.ListMap
 import org.joda.time.LocalDate
 import collection.JavaConversions._
+import java.util.LinkedHashMap
 
 package object table {
   type Value = Option[Double]
@@ -17,38 +18,39 @@ trait FinFact {
   def getLocalDate(): LocalDate
 }
 
-// facts for a simple income statement
-
-case class IncomeStmt(
-  date: LocalDate,
-  revenue: Option[Long] = None,
-  costOfGoodsSold: Option[Long] = None) extends FinFact {
-  def getLocalDate(): LocalDate = date
-}
-// shouold use immutable treemap?
-case class RowMap(var rmap: collection.immutable.Map[String, Row] = collection.immutable.Map.empty) {
+/*
+ * 
+ * 
+ */
+case class RowMap(var rmap: collection.immutable.Map[String, Row] = collection.immutable.ListMap.empty) {
   def add(key: String, row: Row): Row = {
     rmap += (key -> row) // if rmap is avar i can use += else I cant'.. i can only use + , what does this mean?
     row
   }
-  def get(key: String) = rmap.get(key)
+  def getRow(key: String) = rmap.get(key)
   def avg() = RowMap(rmap.mapValues(_.avg))
   def gr() = RowMap(rmap.mapValues(_.gr))
   def grAvg() = gr avg
+  def print(label: String = "test") = {
+    val (key, value) = rmap.head
+    val colRow = label +: value.getColSeq
+    val rowList: Seq[Seq[String]] = rmap.map {
+      case (k, v) => k.toString() +: v.getSeq
+    }(collection.breakOut): Seq[Seq[String]]
+    val table: Seq[Seq[String]] = colRow +: rowList
+    println(Tabulator.format(table))
+  }
+}
+// use trait?
+class RowMapBuilder() {
+  protected val map: RowMap = new RowMap
+  def calcRow(label: String, row: Row): Row = map.add(label, row)
+  def getRow(label: String) = map.getRow(label)
+  def getMap = map
 }
 
-
-class RowBuilder(factList: java.util.List[FinFact]) {
-  private val map: RowMap = new RowMap
-
-  def exstractRow(label: String, methodName: String): Row = map.add(label, Row(factList, methodName))
-
-  def calcRow(label: String, row: Row): Row = map.add(label, row)
-
-  def getRow(label: String) = map.get(label)
-
-  def getMap = map
-
+class FinFactRowMapBuilder(factList: java.util.List[FinFact]) extends RowMapBuilder {
+  def exstractRow(label: String, methodName: String): Row = this.map.add(label, Row(factList, methodName))
 }
 
 // do i want this kind of equality? if you add the same day.. it overrides one alreayd aded.. is this ok??? maybe not a case class.....
@@ -57,40 +59,54 @@ case class ColIndex(label: String, date: LocalDate) {
 }
 
 object ColIndex {
-
   implicit def colIndexOrdering: Ordering[ColIndex] = Ordering.fromLessThan(_.date isBefore _.date)
-
   def apply(dateAsString: String) = new ColIndex(dateAsString, table.date(dateAsString))
-
   def apply(label: String, dateStr: String) = new ColIndex(label, table.date(dateStr))
-
   def apply(date: LocalDate) = new ColIndex(date.toString(), date)
-
 }
 /**
  * not sure we need cells at all?
  */
-case class Cell(column: ColIndex, value: table.Value) { //not sure if cell needs row index..
-  override def toString: String = "[" + value.getOrElse("-").formatted("%.3f") + "]"
+case class Cell(column: ColIndex, value: table.Value) {
+  override def toString: String = value.getOrElse("-").formatted("%.3f")
 }
 
 case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
 
   def plus(that: Row) = applyZipFn(that, addRowTuple, this.desc + "+" + that.desc)
+  def plus(in: Double) = transform(in, addRowTuple)
+
   def minus(that: Row) = applyZipFn(that, subRowTuple, this.desc + "-" + that.desc)
+  def minus(in: Double) = transform(in, subRowTuple)
+
   def mult(that: Row) = applyZipFn(that, multRowTuple, this.desc + "*" + that.desc)
+  def mult(in: Double) = transform(in, multRowTuple)
+
   def div(that: Row) = applyZipFn(that, divRowTuple, this.desc + "/" + that.desc)
+  def div(in: Double) = transform(in, divRowTuple)
+  
+  def pow(that: Row) = applyZipFn(that, powRowTuple, this.desc + "/" + that.desc)
+  def pow(in: Double) = transform(in, powRowTuple)
+
   def incDec() = calc(increaseDecrease, "incDec(" + this.desc + ")")
   def gr() = calc(growthRate, "gr(" + this.desc + ")")
   def avg() = average;
   def ttm() = trailingFourPeriods;
 
+  // scala api
   def +(that: Row) = plus(that)
+  def +(in: Double) = transform(in, addRowTuple)
   def -(that: Row) = minus(that)
+  def -(in: Double) = transform(in, subRowTuple)
   def *(that: Row) = mult(that)
+  def *(in: Double) = transform(in, multRowTuple)
   def /(that: Row) = div(that)
-  // todo: weigthed avg.
+  def /(in: Double) = transform(in, divRowTuple)
+  def ^(that: Row) = pow(that)
+  def ^(in: Double) = transform(in, powRowTuple)
 
+  // todo: weigthed avg.
+  
   override def toString: String = desc + ":" + row
 
   def getLastCell: Option[Cell] = row.get(row.lastKey)
@@ -98,6 +114,10 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
   def getColumns: java.util.Set[ColIndex] = row.keySet
 
   def getValues = row.values.map(_.value.getOrElse(Double.NaN)).toArray
+
+  def getSeq: Seq[String] = row.values.map(_.toString)(collection.breakOut): Seq[String]
+
+  def getColSeq: Seq[String] = row.keySet.map(_.label)(collection.breakOut): Seq[String]
 
   def getColumIndices = row.keys.map(row.keys.toSeq.indexOf(_)).toList.reverse
 
@@ -134,6 +154,24 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
       case (None, Some(r)) => if (r != 0) Some(0D) else None
       case _ => None
     }
+  }
+  
+    private def powRowTuple(pair: table.ValuePair): table.Value = {
+    pair match {
+      case (Some(l), Some(r)) => Some(math.pow(l, r))
+      case _ => None
+    }
+  }
+
+  def transform(number: Double, fn: (table.ValuePair => table.Value)) = {
+    val tm: TreeMap[ColIndex, Cell] = this.row.map {
+      case (k, v) =>
+        val tup = (v.value, Option(number))
+        val result = fn(tup)
+        (k, Cell(k, result))
+    }
+
+    Row(tm, "trans")
   }
 
   def applyZipFn(that: Row, fn: ((Option[Double], Option[Double])) => Option[Double], fnDesc: String) = {
@@ -246,6 +284,32 @@ object Row {
     x.toList.reduceLeft(_ + _)
   }
 
+}
+
+object Tabulator {
+  def format(table: Seq[Seq[Any]]) = table match {
+    case Seq() => ""
+    case _ =>
+      val sizes = for (row <- table) yield (for (cell <- row) yield if (cell == null) 0 else cell.toString.length)
+      val colSizes = for (col <- sizes.transpose) yield col.max
+      val rows = for (row <- table) yield formatRow(row, colSizes)
+      formatRows(rowSeparator(colSizes), rows)
+  }
+
+  def formatRows(rowSeparator: String, rows: Seq[String]): String = (
+    rowSeparator ::
+    rows.head ::
+    rowSeparator ::
+    rows.tail.toList :::
+    rowSeparator ::
+    List()).mkString("\n")
+
+  def formatRow(row: Seq[Any], colSizes: Seq[Int]) = {
+    val cells = (for ((item, size) <- row.zip(colSizes)) yield if (size == 0) "" else ("%" + size + "s").format(item))
+    cells.mkString("|", "|", "|")
+  }
+
+  def rowSeparator(colSizes: Seq[Int]) = colSizes map { "-" * _ } mkString ("+", "+", "+")
 }
 
 
