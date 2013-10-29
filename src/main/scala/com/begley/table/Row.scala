@@ -6,6 +6,7 @@ import scala.collection.immutable.ListMap
 import org.joda.time.LocalDate
 import collection.JavaConversions._
 import java.util.LinkedHashMap
+import org.joda.convert.ToString
 
 package object table {
   type Value = Option[Double]
@@ -29,8 +30,10 @@ case class RowMap(var rmap: collection.immutable.Map[String, Row] = collection.i
   }
   def getRow(key: String) = rmap.get(key)
   def avg() = RowMap(rmap.mapValues(_.avg))
+  def wavg() = RowMap(rmap.mapValues(_.wa))
   def gr() = RowMap(rmap.mapValues(_.gr))
   def grAvg() = gr avg
+  def grWavg() = gr wavg
 
   def print(label: String = "test") = {
     val (key, value) = rmap.head
@@ -55,6 +58,7 @@ class FinFactRowMapBuilder(factList: java.util.List[FinFact]) extends RowMapBuil
 }
 
 // do i want this kind of equality? if you add the same day.. it overrides one alreayd aded.. is this ok??? maybe not a case class.....
+// also, when we make a "indxed" cell w/ lable .. it's not longer equal to non indexed cell.. this could be wrong..
 case class ColIndex(label: String, date: LocalDate) {
   override def toString: String = label
 }
@@ -106,10 +110,17 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
   def ^(that: Row) = pow(that)
   def ^(in: Double) = transform(in, powRowTuple)
 
-
   override def toString: String = desc + ":" + row
 
-  def getLastCell: Option[Cell] = row.get(row.lastKey)
+  // todo: shoudl be ableo to get X peroids Back..
+
+  def getLastValue = getValueAt(0)
+
+  def getValueAt(index: Int): Option[Double] = {
+    val seq = row.values.map(_.value)(collection.breakOut): Seq[Option[Double]]
+    val calcedIndex = (seq.size - index) - 1
+    if (calcedIndex < 0) None else seq(calcedIndex)
+  }
 
   def getColumns: java.util.Set[ColIndex] = row.keySet
 
@@ -218,15 +229,18 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
     row.values.foldRight((1, 0D))(
       (cell: Cell, state: (Int, Double)) => {
         val curVal: Double = cell.value.getOrElse(0D)
-        val yearsBack: String = row.keys.toSeq.indexOf(cell.column).toString
-        val colIndex = ColIndex(yearsBack, cell.column.date)
-        //   lm(colIndex) = Cell(colIndex, Some((curVal + state._2) / state._1)) 
-
+        val colIndex =indexedCell(cell)
         tm += colIndex -> Cell(colIndex, Some((curVal + state._2) / state._1))
 
         (state._1 + 1, state._2 + curVal)
       })
     Row(tm, "avg(" + this.desc + ")")
+  }
+
+  private def indexedCell(cell: Cell) = {
+    val index = row.keys.toSeq.indexOf(cell.column)
+    val yearsBack: String = (index - (row.keys.size - 1)).abs.toString
+    ColIndex(yearsBack, cell.column.date)
   }
 
   def growthRate(pair: table.ValuePair): table.Value = {
@@ -243,21 +257,22 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
       case _ => None
     }
   }
-  
+
   /**
    * TODO: refactor this!
    */
-  def wa:Row={
+  def wa: Row = {
     var tm = TreeMap[ColIndex, Cell]()
-    
-    val doubleList = this.row.values.map(_.value.getOrElse(0D))(collection.breakOut):List[Double]
+
+    val doubleList = this.row.values.map(_.value.getOrElse(0D))(collection.breakOut): List[Double]
     val wAvgList = wAvg(doubleList)
     var x = 0
-    for( (k,v) <- this.row  ) {
-      tm += k -> Cell(k,Some(wAvgList( x)))
-      x = x +1
+    for ((k, v) <- this.row) {
+       val colIndex =indexedCell(v)
+      tm += colIndex -> Cell(colIndex, Some(wAvgList(x)))
+      x = x + 1
     }
-   
+
     Row(tm, "wavg(" + this.desc + ")")
   }
 
