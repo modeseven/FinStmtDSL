@@ -31,6 +31,7 @@ case class RowMap(var rmap: collection.immutable.Map[String, Row] = collection.i
   def avg() = RowMap(rmap.mapValues(_.avg))
   def gr() = RowMap(rmap.mapValues(_.gr))
   def grAvg() = gr avg
+
   def print(label: String = "test") = {
     val (key, value) = rmap.head
     val colRow = label +: value.getColSeq
@@ -84,7 +85,7 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
 
   def div(that: Row) = applyZipFn(that, divRowTuple, this.desc + "/" + that.desc)
   def div(in: Double) = transform(in, divRowTuple)
-  
+
   def pow(that: Row) = applyZipFn(that, powRowTuple, this.desc + "/" + that.desc)
   def pow(in: Double) = transform(in, powRowTuple)
 
@@ -105,8 +106,7 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
   def ^(that: Row) = pow(that)
   def ^(in: Double) = transform(in, powRowTuple)
 
-  // todo: weigthed avg.
-  
+
   override def toString: String = desc + ":" + row
 
   def getLastCell: Option[Cell] = row.get(row.lastKey)
@@ -155,8 +155,8 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
       case _ => None
     }
   }
-  
-    private def powRowTuple(pair: table.ValuePair): table.Value = {
+
+  private def powRowTuple(pair: table.ValuePair): table.Value = {
     pair match {
       case (Some(l), Some(r)) => Some(math.pow(l, r))
       case _ => None
@@ -174,7 +174,7 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
     Row(tm, "trans")
   }
 
-  def applyZipFn(that: Row, fn: ((Option[Double], Option[Double])) => Option[Double], fnDesc: String) = {
+  def applyZipFn(that: Row, fn: (table.ValuePair) => table.Value, fnDesc: String) = {
 
     val l = (this.row.values, that.row.values).zipped.map((top: Cell, bottom: Cell) => {
       val tup = (top.value, bottom.value)
@@ -199,7 +199,7 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
     Row(TreeMap(lm.toSeq: _*), "ttm(" + this.desc + ")")
   }
 
-  def calc(fn: ((Option[Double], Option[Double])) => Option[Double], fnDesc: String): Row = {
+  def calc(fn: (table.ValuePair) => table.Value, fnDesc: String): Row = {
     var lm: Map[ColIndex, Cell] = Map()
 
     row.values.foldLeft(Option(0D))((i: Option[Double], cell: Cell) => {
@@ -242,6 +242,36 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
       case (None, Some(r)) => Some(r)
       case _ => None
     }
+  }
+  
+  /**
+   * TODO: refactor this!
+   */
+  def wa:Row={
+    var tm = TreeMap[ColIndex, Cell]()
+    
+    val doubleList = this.row.values.map(_.value.getOrElse(0D))(collection.breakOut):List[Double]
+    val wAvgList = wAvg(doubleList)
+    var x = 0
+    for( (k,v) <- this.row  ) {
+      tm += k -> Cell(k,Some(wAvgList( x)))
+      x = x +1
+    }
+   
+    Row(tm, "wavg(" + this.desc + ")")
+  }
+
+  def wAvg(x: List[Double]): List[Double] = {
+    def loop(inner: List[Double], accum: List[Double]): List[Double] = {
+      val result = accum :+ weightAvg(inner)
+      val tail = inner.tail
+      if (tail.isEmpty) result else loop(tail, result)
+    }
+    loop(x, List())
+  }
+
+  def weightAvg(x: List[Double]): Double = {
+    x.foldLeft((1, 0D))((tup, li) => (tup._1 + 1, tup._2 + li * tup._1))._2 / (1 to x.size).sum
   }
 
 }
