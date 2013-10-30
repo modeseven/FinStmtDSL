@@ -73,7 +73,7 @@ object ColIndex {
  * not sure we need cells at all?
  */
 case class Cell(column: ColIndex, value: table.Value) {
-  override def toString: String = value.getOrElse("-").formatted("%.3f")
+  override def toString: String = value.getOrElse("-").toString //.formatted("%1.0f")
 }
 
 case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
