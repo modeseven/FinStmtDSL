@@ -13,6 +13,7 @@ package object table {
   type ValuePair = (Value, Value)
   val dateFormat = new java.text.SimpleDateFormat("mm/dd/yyyy")
   def date(dateStr: String) = LocalDate.fromDateFields(table.dateFormat.parse(dateStr))
+  val df = new java.text.DecimalFormat("###,###.###")
 }
 
 trait FinFact {
@@ -53,7 +54,7 @@ class RowMapBuilder() {
   def getMap = map
 }
 
-class FinFactRowMapBuilder(factList: java.util.List[FinFact]) extends RowMapBuilder {
+class FinFactRowMapBuilder(factList: java.util.List[_ <: FinFact]) extends RowMapBuilder {
   def exstractRow(label: String, methodName: String): Row = this.map.add(label, Row(factList, methodName))
 }
 
@@ -73,7 +74,10 @@ object ColIndex {
  * not sure we need cells at all?
  */
 case class Cell(column: ColIndex, value: table.Value) {
-  override def toString: String = value.getOrElse("-").toString //.formatted("%1.0f")
+  override def toString: String = {
+    if(!value.isDefined) "-" else table.df.format(value.get)
+    // figure out hiow to format both doubles and longs.. might nee to use java native formatters?
+  }
 }
 
 case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
@@ -299,7 +303,7 @@ object Row {
   }
 
   // CHANGE TO "EXSTRACT ROW" and make it an Optional[Row]
-  def apply(list: java.util.List[FinFact], property: String): Row = {
+  def apply(list: java.util.List[_ <: FinFact], property: String): Row = {
 
     var tm = TreeMap[ColIndex, Cell]()
 
