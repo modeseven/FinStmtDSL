@@ -51,6 +51,7 @@ class RowMapBuilder() {
   protected val map: RowMap = new RowMap
   def calcRow(label: String, row: Row): Row = map.add(label, row)
   def getRow(label: String) = map.getRow(label)
+  def fillRow(label:String,value:Double) = {} //todo: implement me
   def getMap = map
 }
 
@@ -71,7 +72,7 @@ object ColIndex {
   def apply(date: LocalDate) = new ColIndex(date.toString(), date)
 }
 /**
- * not sure we need cells at all?
+ * not sure we need cells at all? could perhaps use AnyVal and flesh out math for Double -> Long and vice veras?
  */
 case class Cell(column: ColIndex, value: table.Value) {
   override def toString: String = {
@@ -116,8 +117,7 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
 
   override def toString: String = desc + ":" + row
 
-  // todo: shoudl be ableo to get X peroids Back..
-
+//TODO: NEED JAVA API (RETURN JAVA.UTIL.LIST) ETC..
   def getLastValue = getValueAt(0)
 
   def getValueAt(index: Int): Option[Double] = {
@@ -185,7 +185,17 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
         val result = fn(tup)
         (k, Cell(k, result))
     }
-
+    Row(tm, "trans")
+  }
+  
+  // this is probably a row Builder function...
+    def fillRow(number: Double) = {
+    val tm: TreeMap[ColIndex, Cell] = this.row.map {
+      case (k, v) =>
+        val tup = (v.value, Option(number))
+        val result = Option(number)
+        (k, Cell(k, result))
+    }
     Row(tm, "trans")
   }
 
@@ -225,9 +235,8 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
     Row(TreeMap(lm.toSeq: _*), fnDesc)
   }
 
+  // could be much more elegant
   private def average(): Row = {
-    //  var lm: Map[ColIndex, Cell] = Map()
-
     var tm = TreeMap[ColIndex, Cell]()
 
     row.values.foldRight((1, 0D))(
