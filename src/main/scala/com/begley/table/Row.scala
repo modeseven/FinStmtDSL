@@ -29,12 +29,18 @@ case class RowMap(var rmap: collection.immutable.Map[String, Row] = collection.i
     rmap += (key -> row) // if rmap is avar i can use += else I cant'.. i can only use + , what does this mean?
     row
   }
+  
+  def getHeadRow() = rmap.values.head
   def getRow(key: String) = rmap.get(key)
   def avg() = RowMap(rmap.mapValues(_.avg))
   def wavg() = RowMap(rmap.mapValues(_.wa))
   def gr() = RowMap(rmap.mapValues(_.gr))
+  def incDec() = RowMap(rmap.mapValues(_.incDec))
+  def ttm() = RowMap(rmap.mapValues(_.ttm))
+  
   def grAvg() = gr avg
   def grWavg() = gr wavg
+  def grIncDec() = gr incDec
 
   def print(label: String = "test") = {
     val (key, value) = rmap.head
@@ -49,14 +55,16 @@ case class RowMap(var rmap: collection.immutable.Map[String, Row] = collection.i
 // use trait?
 class RowMapBuilder() {
   protected val map: RowMap = new RowMap
-  def calcRow(label: String, row: Row): Row = map.add(label, row)
+  def addRow(label: String, row: Row): Row = map.add(label, row)
   def getRow(label: String) = map.getRow(label)
-  def fillRow(label:String,value:Double) = {} //todo: implement me
+  def createRow(value:Double):Row = {
+    this.map.getHeadRow.fillRow(value) // this will erorr out if no HEAD
+  } 
   def getMap = map
 }
 
 class FinFactRowMapBuilder(factList: java.util.List[_ <: FinFact]) extends RowMapBuilder {
-  def exstractRow(label: String, methodName: String): Row = this.map.add(label, Row(factList, methodName))
+  def addExstractedRow(label: String, methodName: String): Row = this.map.add(label, Row(factList, methodName))
 }
 
 // do i want this kind of equality? if you add the same day.. it overrides one alreayd aded.. is this ok??? maybe not a case class.....
@@ -117,7 +125,7 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
 
   override def toString: String = desc + ":" + row
 
-//TODO: NEED JAVA API (RETURN JAVA.UTIL.LIST) ETC..
+//TODO: NEED JAVA API (RETURN JAVA.UTIL.LIST) ETC.. java friendly? Option? what? goodl
   def getLastValue = getValueAt(0)
 
   def getValueAt(index: Int): Option[Double] = {
@@ -135,6 +143,8 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
   def getColSeq: Seq[String] = row.keySet.map(_.label)(collection.breakOut): Seq[String]
 
   def getColumIndices = row.keys.map(row.keys.toSeq.indexOf(_)).toList.reverse
+  
+  def sumAll:Double =getValues.reduceRight(_ + _)
 
   private def addRowTuple(pair: table.ValuePair): table.Value = {
     pair match {
@@ -311,7 +321,7 @@ object Row {
     def setV(name: String, value: Any): Unit = ref.getClass.getMethods.find(_.getName == name + "_$eq").get.invoke(ref, value.asInstanceOf[AnyRef])
   }
 
-  // CHANGE TO "EXSTRACT ROW" and make it an Optional[Row]
+  // TODO: CHANGE TO "EXSTRACT ROW" and make it an Optional[Row]
   def apply(list: java.util.List[_ <: FinFact], property: String): Row = {
 
     var tm = TreeMap[ColIndex, Cell]()

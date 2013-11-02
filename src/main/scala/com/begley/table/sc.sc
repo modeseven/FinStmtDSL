@@ -6,7 +6,14 @@ import scala.beans.BeanProperty
 object Scratch {
 
   
-  1/math.pow(1 + .1615, .5)                       //> res0: Double = 0.9278769642487465
+
+ 
+  val band: TreeMap[String, Int] = TreeMap("Dave" -> 10,
+                "Tony" -> 20,
+                "Greg" -> 30)                     //> band  : scala.collection.immutable.TreeMap[String,Int] = Map(Dave -> 10, Gre
+                                                  //| g -> 30, Tony -> 20)
+                                                  
+   band.values.reduceRight(_ + _)                 //> res0: Int = 60
 
 
 

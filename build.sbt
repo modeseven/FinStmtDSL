@@ -21,5 +21,7 @@ libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "0.6.0"
 
 libraryDependencies += "com.novocode" % "junit-interface" % "0.9" % "test"
 
+libraryDependencies += "com.google.guava" % "guava" % "15.0"
+
 
 
