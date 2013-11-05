@@ -86,6 +86,7 @@ case class Cell(column: ColIndex, value: table.Value) {
   override def toString: String = {
     if(!value.isDefined) "-" else table.df.format(value.get)
     // figure out hiow to format both doubles and longs.. might nee to use java native formatters?
+    // TODO: define "DoubleRow" and "LongRow"?
   }
 }
 
@@ -126,17 +127,19 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
   override def toString: String = desc + ":" + row
 
 //TODO: NEED JAVA API (RETURN JAVA.UTIL.LIST) ETC.. java friendly? Option? what? goodl
-  def getLastValue = getValueAt(0)
+  def getLastValue: java.lang.Double = getValueAt(0)
 
-  def getValueAt(index: Int): Option[Double] = {
+  def getValueAt(index: Int): java.lang.Double = {
     val seq = row.values.map(_.value)(collection.breakOut): Seq[Option[Double]]
     val calcedIndex = (seq.size - index) - 1
-    if (calcedIndex < 0) None else seq(calcedIndex)
+    if (calcedIndex < 0 || seq(calcedIndex).isEmpty) java.lang.Double.NaN else seq(calcedIndex).get
   }
 
   def getColumns: java.util.Set[ColIndex] = row.keySet
 
   def getValues = row.values.map(_.value.getOrElse(Double.NaN)).toArray
+  
+  def getValuesAsStr = getValues.mkString(",")
 
   def getSeq: Seq[String] = row.values.map(_.toString)(collection.breakOut): Seq[String]
 
@@ -236,8 +239,8 @@ case class Row(row: TreeMap[ColIndex, Cell], desc: String) {
 
   def calc(fn: (table.ValuePair) => table.Value, fnDesc: String): Row = {
     var lm: Map[ColIndex, Cell] = Map()
-
-    row.values.foldLeft(Option(0D))((i: Option[Double], cell: Cell) => {
+    val seed:Option[Double] = None
+    row.values.foldLeft(seed)((i: Option[Double], cell: Cell) => {
       val incDec: Option[Double] = fn(i, cell.value)
       lm(cell.column) = Cell(cell.column, incDec)
       cell.value
@@ -321,9 +324,9 @@ object Row {
     def setV(name: String, value: Any): Unit = ref.getClass.getMethods.find(_.getName == name + "_$eq").get.invoke(ref, value.asInstanceOf[AnyRef])
   }
 
-  // TODO: CHANGE TO "EXSTRACT ROW" and make it an Optional[Row]
-  def apply(list: java.util.List[_ <: FinFact], property: String): Row = {
 
+  def apply(list: java.util.List[_ <: FinFact], property: String): Row = {
+		  // could potentally return empty row
     var tm = TreeMap[ColIndex, Cell]()
 
     list.toList.map((is: FinFact) => {
